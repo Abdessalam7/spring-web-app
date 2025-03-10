@@ -1,0 +1,30 @@
+# prompt: i want to run multiple commands in kubernetesPodOperator in airflow, 
+# run-shell-file test --select my_data --target environment --vars {"suffix":"20240202"}
+# run-shell-file --select "result:error"
+# where environment and mydata are variables, and i want to keep the double quotes and the json format for the --vars
+
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+from airflow import DAG
+from datetime import datetime
+
+with DAG(
+    dag_id='kubernetes_multiple_commands',
+    start_date=datetime(2023, 10, 26),
+    schedule=None,
+    catchup=False
+) as dag:
+    
+    environment = "prod"  # Replace with your actual environment variable
+    my_data = "my_dataset" # Replace with your actual my_data variable
+
+    k8s_task = KubernetesPodOperator(
+        task_id='multiple_commands',
+        name='my-kubernetes-pod',
+        namespace='default', # Replace with your Kubernetes namespace
+        image='your-docker-image', # Replace with your Docker image
+        cmds=["bash", "-cx"], # Use bash -cx to execute commands sequentially and exit on error.
+        arguments=[
+            'run-shell-file test --select "{my_data}" --target "{environment}" --vars "{\\"suffix\\":\\"20240202\\"}" && run-shell-file --select "result:error"'.format(my_data=my_data, environment=environment)
+        ],
+        # ... other KubernetesPodOperator arguments
+    )
