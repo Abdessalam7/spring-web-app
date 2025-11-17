@@ -1,0 +1,96 @@
+include:
+  - project: "market-place/ap43591/gitlab-templates"
+    ref: main
+    file:
+      - /integration/default.yml
+      - /deployment/terraform.yml
+
+stages:
+  - plan
+  - test
+  - apply
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+# ---------- COMMON VARIABLES ----------
+variables:
+  # Folder where your Terraform files live
+  TF_ROOT: vault-pysmoke
+
+  # Remote Terraform state (one state for this project/env)
+  TF_ADDRESS: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/vault-${VAULT_NAMESPACE}-${CI_ENVIRONMENT_NAME}"
+
+  # Pass Vault info into Terraform variables
+  TF_VAR_vault_addr: "$VAULT_ADDR"
+  TF_VAR_vault_namespace: "$VAULT_NAMESPACE"
+
+# =====================================================
+# PLAN (single environment: staging)
+# =====================================================
+
+plan:
+  stage: plan
+  extends: .tpl:deployment:terraform:plan
+  id_tokens: !reference [".tpl.integration:vault:init", "id_tokens"]
+  environment:
+    name: staging          # this will be CI_ENVIRONMENT_NAME
+    deployment_tier: staging
+    action: prepare
+
+# =====================================================
+# TESTS (validate / fmt / lint) on same TF_ROOT
+# =====================================================
+
+test:validate:
+  stage: test
+  extends: .tpl:deployment:terraform:validate
+  id_tokens: !reference [".tpl.integration:vault:init", "id_tokens"]
+  needs: []
+  variables:
+    TF_ROOT: vault-pysmoke
+
+test:fmt:
+  stage: test
+  extends: .tpl:deployment:terraform:fmt
+  id_tokens: !reference [".tpl.integration:vault:init", "id_tokens"]
+  needs: []
+  variables:
+    TF_ROOT: vault-pysmoke
+
+test:lint:
+  stage: test
+  extends: .tpl:deployment:terraform:lint
+  id_tokens: !reference [".tpl.integration:vault:init", "id_tokens"]
+  needs: []
+  variables:
+    TF_ROOT: vault-pysmoke
+
+# =====================================================
+# APPLY (manual, single env: staging)
+# =====================================================
+
+apply:
+  stage: apply
+  extends: .tpl:deployment:terraform:apply
+  id_tokens: !reference [".tpl.integration:vault:init", "id_tokens"]
+  variables:
+    TF_ROOT: vault-pysmoke
+  needs:
+    - job: plan
+      artifacts: true
+    - job: test:lint
+    - job: test:fmt
+    - job: test:validate
+  environment:
+    name: staging          # same env as plan
+    deployment_tier: staging
+    action: start
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
