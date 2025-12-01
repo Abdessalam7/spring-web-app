@@ -1,0 +1,23 @@
+# On nettoie tout ce qui peut traîner
+unset AIRFLOW_HOME
+unset AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+unset AIRFLOW__CORE__SQL_ALCHEMY_CONN
+unset AIRFLOW__LOGGING__BASE_LOG_FOLDER
+unset AIRFLOW__CORE__DAGS_FOLDER
+
+# On crée un AIRFLOW_HOME simple dans ton HOME bash
+export AIRFLOW_HOME="$HOME/airflow_home"
+mkdir -p "$AIRFLOW_HOME"
+
+# Et surtout : on suit EXACTEMENT l'exemple du message d'erreur
+# 4 slash, chemin POSIX /tmp/airflow.db
+mkdir -p /tmp
+export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="sqlite:////tmp/airflow.db"
+
+# (optionnel)
+export AIRFLOW__LOGGING__BASE_LOG_FOLDER="$AIRFLOW_HOME/logs"
+export AIRFLOW__CORE__DAGS_FOLDER="$AIRFLOW_HOME/dags"
+mkdir -p "$AIRFLOW_HOME/logs" "$AIRFLOW_HOME/dags"
+
+# Vérifier ce que voit le shell
+env | grep AIRFLOW
